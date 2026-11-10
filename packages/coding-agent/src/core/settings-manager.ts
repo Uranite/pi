@@ -81,8 +81,14 @@ function deepMergeObjects(base: Record<string, unknown>, overrides: Record<strin
 	return result;
 }
 
-/** Tools enabled at startup when `defaultTools` does not change them. */
-export const DEFAULT_TOOL_NAMES: readonly string[] = ["read", "bash", "edit", "write"];
+/**
+ * Tools enabled at startup when `defaultTools` does not change them. On Windows the default set
+ * includes `powershell` so the native shell is available without configuration (#7547); on other
+ * platforms PowerShell does not exist.
+ */
+export function getDefaultToolNames(platform: NodeJS.Platform = process.platform): string[] {
+	return platform === "win32" ? ["read", "bash", "powershell", "edit", "write"] : ["read", "bash", "edit", "write"];
+}
 
 /** Whether a tool selection entry is a `+name` or `-name` modifier. */
 export function isToolModifier(entry: unknown): boolean {
@@ -131,12 +137,12 @@ function mergeDefaultTools(base: string[] | undefined, overrides: string[] | und
 }
 
 /**
- * Resolve a merged `defaultTools` list: plain names replace `DEFAULT_TOOL_NAMES`, then `+name` adds
- * and `-name` removes a tool, in list order.
+ * Resolve a merged `defaultTools` list: plain names replace `getDefaultToolNames()`, then `+name`
+ * adds and `-name` removes a tool, in list order.
  */
 function resolveDefaultTools(entries: string[]): string[] {
 	const plain = entries.filter((entry) => !isToolModifier(entry));
-	return applyToolModifiers(plain.length > 0 || entries.length === 0 ? plain : DEFAULT_TOOL_NAMES, entries);
+	return applyToolModifiers(plain.length > 0 || entries.length === 0 ? plain : getDefaultToolNames(), entries);
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */

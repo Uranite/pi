@@ -113,7 +113,7 @@ describe("buildSystemPrompt", () => {
 		test.each([
 			[["bash"], "Git Bash/MSYS"],
 			[["powershell"], "native Windows paths"],
-			[["bash", "powershell"], "Prefer the powershell tool"],
+			[["bash", "powershell"], "PowerShell is the primary shell on Windows"],
 		] as const)("describes the Windows shell for %j", (selectedTools, expected) => {
 			const prompt = buildSystemPrompt({
 				platform: "win32",

@@ -1,6 +1,6 @@
 # Run Pi on Windows
 
-Run Pi either as a native Windows process or inside Windows Subsystem for Linux (WSL). Native Windows uses Git Bash by default for Bash commands and can optionally expose PowerShell to the model. Pi inside WSL uses the Linux environment and its Bash installation.
+Run Pi either as a native Windows process or inside Windows Subsystem for Linux (WSL). Native Windows enables both the `powershell` tool and the Git Bash `bash` tool by default, with PowerShell as the model's primary shell. Pi inside WSL uses the Linux environment and its Bash installation.
 
 Follow the main [Quickstart](quickstart.md) to install and authenticate Pi. Use this page to choose and configure its command environment.
 
@@ -8,8 +8,7 @@ Follow the main [Quickstart](quickstart.md) to install and authenticate Pi. Use 
 
 | Environment | Command environment | Use it when |
 |---|---|---|
-| Native Windows with Git Bash | Git Bash for the built-in `bash` tool and `!` commands | Your files and development tools primarily live on Windows |
-| Native Windows with the `powershell` tool | PowerShell for model tool calls; Bash remains available for `!` commands | The task depends on PowerShell modules or Windows-native commands |
+| Native Windows | PowerShell via the `powershell` tool plus Git Bash for the `bash` tool and `!` commands | Your files and development tools primarily live on Windows |
 | WSL | Linux Bash and tools inside the selected WSL distribution | Your files and toolchain already live in Linux or WSL |
 
 ## Use Git Bash on native Windows
@@ -33,7 +32,7 @@ If Pi cannot find Bash, it reports the locations it checked. Install Git for Win
 
 ## Let the model use PowerShell
 
-The optional `powershell` tool runs commands through `pwsh.exe` when available, then falls back to Windows PowerShell. It starts PowerShell with `-NoProfile -NonInteractive -ExecutionPolicy Bypass`. Administrator-enforced execution policies can still take precedence.
+The `powershell` tool is enabled by default on native Windows and runs commands through `pwsh.exe` when available, then falls back to Windows PowerShell. It starts PowerShell with `-NoProfile -NonInteractive -ExecutionPolicy Bypass`. Administrator-enforced execution policies can still take precedence.
 
 Commands are written to PowerShell's stdin rather than its command line, so long scripts are not limited by the 32,767-character Windows command-line cap. Output is decoded as UTF-8, and Windows PowerShell 5.1 also gets `$OutputEncoding` set to UTF-8 so non-ASCII text piped to native programs is not garbled.
 
@@ -44,7 +43,13 @@ PowerShell discovery checks these locations in order:
 3. `powershell.exe` on `PATH`
 4. `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`
 
-To replace the model-facing `bash` tool with `powershell`, add this to `~/.pi/agent/settings.json`:
+To run without PowerShell, or to replace `bash` with `powershell` as the only shell, add one of these to `~/.pi/agent/settings.json`:
+
+```json
+{
+  "defaultTools": ["read", "bash", "edit", "write"]
+}
+```
 
 ```json
 {

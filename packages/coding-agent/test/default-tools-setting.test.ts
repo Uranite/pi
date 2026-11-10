@@ -8,7 +8,7 @@ import { createAgentSessionFromServices, createAgentSessionServices } from "../s
 import { DefaultResourceLoader } from "../src/core/resource-loader.ts";
 import { type CreateAgentSessionOptions, createAgentSession, type InlineExtension } from "../src/core/sdk.ts";
 import { SessionManager } from "../src/core/session-manager.ts";
-import { SettingsManager } from "../src/core/settings-manager.ts";
+import { getDefaultToolNames, SettingsManager } from "../src/core/settings-manager.ts";
 
 type ToolOptions = Pick<CreateAgentSessionOptions, "tools" | "excludeTools" | "noTools" | "customTools">;
 
@@ -93,7 +93,9 @@ describe("defaultTools setting", () => {
 			},
 		]);
 
-		expect(session.getActiveToolNames().sort()).toEqual(["bash", "edit", "inactive_tool", "read"]);
+		expect(session.getActiveToolNames().sort()).toEqual(
+			[...getDefaultToolNames().filter((name) => name !== "write"), "inactive_tool"].sort(),
+		);
 		session.dispose();
 	});
 
@@ -176,14 +178,9 @@ describe("defaultTools setting", () => {
 		};
 
 		const session = await createSession(["+grep"], { tools: ["+inactive_tool", "-write"] }, [inactiveTool]);
-		expect(session.getActiveToolNames().sort()).toEqual([
-			"active_tool",
-			"bash",
-			"edit",
-			"grep",
-			"inactive_tool",
-			"read",
-		]);
+		expect(session.getActiveToolNames().sort()).toEqual(
+			[...getDefaultToolNames().filter((name) => name !== "write"), "active_tool", "grep", "inactive_tool"].sort(),
+		);
 		session.dispose();
 
 		const toolLess = await createSession(["read"], { noTools: "all", tools: ["+inactive_tool"] }, [inactiveTool]);
@@ -240,18 +237,20 @@ describe("defaultTools setting", () => {
 		// #10245
 		it("activates only tools newly added to defaultTools", async () => {
 			const session = await createFileSession();
-			expect(session.getActiveToolNames()).toEqual(["read", "bash", "edit", "write"]);
-			session.setActiveToolsByName(["read", "edit", "write"]);
+			const defaults = session.getActiveToolNames();
+			expect(defaults).toEqual(expect.arrayContaining(["read", "bash", "edit", "write"]));
+			const withoutBashAndWrite = defaults.filter((name) => name !== "bash" && name !== "write");
+			session.setActiveToolsByName(withoutBashAndWrite);
 
 			writeSettings({ defaultTools: ["+inactive_tool", "+grep"] });
 			await session.reload();
 			// bash was disabled during the session and is not newly added, so it stays off.
-			expect(session.getActiveToolNames().sort()).toEqual(["edit", "grep", "inactive_tool", "read", "write"]);
+			expect(session.getActiveToolNames().sort()).toEqual([...withoutBashAndWrite, "grep", "inactive_tool"].sort());
 
 			// Removing tools from the setting does not disable them.
 			writeSettings({ defaultTools: ["-read"] });
 			await session.reload();
-			expect(session.getActiveToolNames().sort()).toEqual(["edit", "grep", "inactive_tool", "read", "write"]);
+			expect(session.getActiveToolNames().sort()).toEqual([...withoutBashAndWrite, "grep", "inactive_tool"].sort());
 			session.dispose();
 		});
 
@@ -284,7 +283,7 @@ describe("defaultTools setting", () => {
 			const excluded = await createFileSession({ excludeTools: ["grep"] });
 			writeSettings({ defaultTools: ["+grep", "+inactive_tool"] });
 			await excluded.reload();
-			expect(excluded.getActiveToolNames().sort()).toEqual(["bash", "edit", "inactive_tool", "read", "write"]);
+			expect(excluded.getActiveToolNames().sort()).toEqual([...getDefaultToolNames(), "inactive_tool"].sort());
 			excluded.dispose();
 		});
 	});
@@ -450,7 +449,7 @@ describe("defaultTools setting", () => {
 			const sessionManager = SessionManager.inMemory(tempDir);
 			sessionManager.appendMessage({ role: "user", content: "hi", timestamp: Date.now() });
 			const session = await resume(sessionManager);
-			expect(session.getActiveToolNames().sort()).toEqual(["active_tool", "bash", "edit", "read", "write"]);
+			expect(session.getActiveToolNames().sort()).toEqual([...getDefaultToolNames(), "active_tool"].sort());
 			session.dispose();
 		});
 	});

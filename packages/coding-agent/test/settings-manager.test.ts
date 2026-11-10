@@ -3,7 +3,10 @@ import { homedir } from "os";
 import { join } from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_HTTP_IDLE_TIMEOUT_MS } from "../src/core/http-dispatcher.ts";
-import { type Settings, SettingsManager } from "../src/core/settings-manager.ts";
+import { getDefaultToolNames, type Settings, SettingsManager } from "../src/core/settings-manager.ts";
+
+// The built-in default selection depends on the platform running the tests.
+const defaultToolNames = getDefaultToolNames();
 
 describe("SettingsManager", () => {
 	const testDir = join(process.cwd(), "test-settings-tmp");
@@ -648,10 +651,9 @@ describe("SettingsManager", () => {
 		});
 
 		it("applies +name and -name to the default selection", () => {
+			const base = defaultToolNames.filter((name) => name !== "write");
 			expect(SettingsManager.inMemory({ defaultTools: ["+codemode", "-write"] }).getDefaultTools()).toEqual([
-				"read",
-				"bash",
-				"edit",
+				...base,
 				"codemode",
 			]);
 			expect(SettingsManager.inMemory({ defaultTools: ["read", "+grep", "+read"] }).getDefaultTools()).toEqual([
@@ -681,10 +683,7 @@ describe("SettingsManager", () => {
 			writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ defaultTools: ["+codemode"] }));
 
 			expect(SettingsManager.create(projectDir, agentDir).getDefaultTools()).toEqual([
-				"read",
-				"bash",
-				"edit",
-				"write",
+				...defaultToolNames,
 				"codemode",
 			]);
 		});

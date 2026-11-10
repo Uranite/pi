@@ -2,9 +2,13 @@
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- On Windows, the `powershell` tool is now enabled by default alongside `bash`, and PowerShell is presented as the primary shell in the system prompt. Sessions that set `defaultTools` are unaffected; to run without PowerShell, set `"defaultTools": ["read", "bash", "edit", "write"]` ([#7547](https://github.com/earendil-works/pi/issues/7547))
+
 ### Added
 
-- On Windows, the system prompt now describes the shell environment: the `bash` tool runs Git Bash/MSYS (POSIX paths in commands, native Windows paths for file tools, `cygpath -w` to convert), and the `powershell` tool is presented as the shell for Windows-native commands and paths ([#7547](https://github.com/earendil-works/pi/issues/7547))
+- On Windows, the system prompt now describes the shell environment: the `powershell` tool is presented as the primary shell for Windows-native commands and paths, and the `bash` tool as Git Bash/MSYS (POSIX paths in commands, native Windows paths for file tools, `cygpath -w` to convert) ([#7547](https://github.com/earendil-works/pi/issues/7547))
 
 ### Fixed
 

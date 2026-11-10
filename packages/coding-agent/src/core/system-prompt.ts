@@ -4,6 +4,7 @@
 
 import { getSystemMessageText } from "@earendil-works/pi-ai";
 import { getDocsPath, getExamplesPath, getReadmePath } from "../config.ts";
+import { getDefaultToolNames } from "./settings-manager.ts";
 import { formatSkillsForPrompt, type Skill } from "./skills.ts";
 
 export interface BuildSystemPromptOptions {
@@ -11,7 +12,7 @@ export interface BuildSystemPromptOptions {
 	customPrompt?: string;
 	/** Exact full prompt replacement set by a before_agent_start handler. */
 	forceSystemPrompt?: string;
-	/** Tools to include in prompt. Default: [read, bash, edit, write]. */
+	/** Tools to include in prompt. Default: `getDefaultToolNames()` (platform-dependent). */
 	selectedTools?: string[];
 	/**
 	 * Selected tools whose declarations requests leave out (`prepareLoadout` hidden declarations).
@@ -64,7 +65,7 @@ export function normalizeBuildSystemPromptOptions(input: BuildSystemPromptOption
 	return {
 		customPrompt: input.customPrompt,
 		forceSystemPrompt: input.forceSystemPrompt,
-		selectedTools: [...(input.selectedTools ?? ["read", "bash", "edit", "write"])],
+		selectedTools: [...(input.selectedTools ?? getDefaultToolNames())],
 		hiddenTools: [...(input.hiddenTools ?? [])],
 		toolSnippets: { ...(input.toolSnippets ?? {}) },
 		toolGuidelines: Object.fromEntries(
@@ -123,16 +124,15 @@ function buildRules(
 	// On Windows the tool name does not tell the model which shell or path rules apply: bash is an
 	// MSYS/Cygwin shell while the file tools take native paths, and PowerShell is the native shell.
 	if (platform === "win32") {
-		if (hasBash) {
-			addRule(
-				"The bash tool runs Git Bash/MSYS on Windows: use POSIX paths inside commands, and pass native Windows paths to the file tools (convert with `cygpath -w`)",
-			);
-		}
 		if (hasPowerShell) {
 			addRule(
 				hasBash
-					? "Prefer the powershell tool for Windows-native commands and paths"
+					? "PowerShell is the primary shell on Windows: use the powershell tool for commands and native Windows paths; the bash tool runs Git Bash/MSYS with POSIX paths (convert paths with `cygpath -w`)"
 					: "The powershell tool runs PowerShell on Windows: use cmdlets and native Windows paths",
+			);
+		} else if (hasBash) {
+			addRule(
+				"The bash tool runs Git Bash/MSYS on Windows: use POSIX paths inside commands, and pass native Windows paths to the file tools (convert with `cygpath -w`)",
 			);
 		}
 	}
