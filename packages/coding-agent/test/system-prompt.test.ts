@@ -139,6 +139,19 @@ describe("buildSystemPrompt", () => {
 			expect(prompt).not.toContain("native Windows paths");
 		});
 
+		// The default tool set follows the `platform` option, not the host, so the rules and the
+		// tool list describe the same machine.
+		test("defaults the selected tools to the given platform", () => {
+			const prompt = buildSystemPrompt({
+				platform: "win32",
+				contextFiles: [],
+				skills: [],
+				cwd: "C:/work",
+			});
+
+			expect(prompt).toContain("PowerShell is the primary shell on Windows");
+		});
+
 		test("instructs models to resolve pi docs and examples under absolute base paths", () => {
 			const prompt = buildSystemPrompt({
 				contextFiles: [],

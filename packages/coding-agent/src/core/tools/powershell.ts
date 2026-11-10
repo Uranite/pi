@@ -13,8 +13,11 @@ import {
 } from "./bash.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 
+// `$OutputEncoding` is what PowerShell encodes text with when piping to a native program. It must
+// be a BOM-less UTF-8 encoder: `[Console]::OutputEncoding` carries a preamble, and the BOM it
+// writes breaks programs that parse the first bytes, such as JSON readers.
 const UTF8_OUTPUT_PREFIX =
-	"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[Console]::OutputEncoding } catch {}\n";
+	"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.UTF8Encoding]::new($false) } catch {}\n";
 
 // The script arrives on stdin, so report the `-Command` exit rule manually: 0 on success, 1 on
 // failure. `exit` ends the runspace before the console host flushes formatted pipeline output, so

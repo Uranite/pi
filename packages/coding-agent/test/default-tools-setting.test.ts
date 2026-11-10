@@ -238,7 +238,7 @@ describe("defaultTools setting", () => {
 		it("activates only tools newly added to defaultTools", async () => {
 			const session = await createFileSession();
 			const defaults = session.getActiveToolNames();
-			expect(defaults).toEqual(expect.arrayContaining(["read", "bash", "edit", "write"]));
+			expect(defaults).toEqual(getDefaultToolNames());
 			const withoutBashAndWrite = defaults.filter((name) => name !== "bash" && name !== "write");
 			session.setActiveToolsByName(withoutBashAndWrite);
 

@@ -3,7 +3,7 @@ import { win32 } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createLocalPowerShellOperations, createPowerShellTool } from "../src/core/tools/powershell.ts";
 import type * as Shell from "../src/utils/shell.ts";
-import { getPowerShellConfig, POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND } from "../src/utils/shell.ts";
+import { getPowerShellConfig, POWERSHELL_BOOTSTRAP_ARGS, POWERSHELL_STDIN_COMMAND } from "../src/utils/shell.ts";
 
 const { shellOverride } = vi.hoisted(() => ({ shellOverride: { path: undefined as string | undefined } }));
 
@@ -15,7 +15,7 @@ vi.mock("../src/utils/shell.ts", async (importOriginal) => {
 			shellOverride.path
 				? {
 						shell: shellOverride.path,
-						args: [...actual.POWERSHELL_ARGS, actual.POWERSHELL_STDIN_COMMAND],
+						args: [...actual.POWERSHELL_BOOTSTRAP_ARGS, actual.POWERSHELL_STDIN_COMMAND],
 						commandTransport: "stdin" as const,
 					}
 				: actual.getPowerShellConfig(),
@@ -45,15 +45,11 @@ afterEach(() => {
 });
 
 describe("powershell tool", () => {
-	it("uses process-local execution policy bypass", () => {
-		expect(POWERSHELL_ARGS).toEqual(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"]);
-	});
-
 	it.skipIf(process.platform !== "win32")("executes PowerShell commands with UTF-8 output", async () => {
 		const config = getPowerShellConfig();
 		expect(config).toEqual({
 			shell: config.shell,
-			args: [...POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND],
+			args: [...POWERSHELL_BOOTSTRAP_ARGS, POWERSHELL_STDIN_COMMAND],
 			commandTransport: "stdin",
 		});
 
@@ -167,6 +163,49 @@ describe("powershell tool", () => {
 			120_000,
 		);
 	}
+
+	// Piped text must reach native programs as UTF-8. Windows PowerShell 5.1 otherwise uses its
+	// ASCII `$OutputEncoding` and turns `€` into `?`.
+	for (const fileName of ["powershell.exe", "pwsh.exe"] as const) {
+		const shellPath = findPowerShell(fileName);
+		it.skipIf(!shellPath)(`pipes text to native programs as UTF-8 with ${fileName}`, async () => {
+			shellOverride.path = shellPath;
+			let output = "";
+			const { exitCode } = await createLocalPowerShellOperations().exec(
+				`'€' | node -e "process.stdin.on('data',d=>console.log(d.toString('hex')))"`,
+				process.cwd(),
+				{
+					onData: (data) => {
+						output += data.toString();
+					},
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(output).toContain("e282ac");
+		});
+	}
+
+	// `$OutputEncoding` must be BOM-less: a UTF-8 preamble breaks programs that parse the first
+	// bytes of their stdin. Windows PowerShell 5.1 adds one through its console encoding regardless.
+	const pwshPath = findPowerShell("pwsh.exe");
+	it.skipIf(!pwshPath)("pipes text to native programs without a BOM with pwsh.exe", async () => {
+		shellOverride.path = pwshPath;
+		let output = "";
+		const { exitCode } = await createLocalPowerShellOperations().exec(
+			`'{"a":1}' | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log('a=' + JSON.parse(s).a))"`,
+			process.cwd(),
+			{
+				onData: (data) => {
+					output += data.toString();
+				},
+			},
+		);
+
+		expect(exitCode).toBe(0);
+		expect(output).not.toContain("\uFEFF");
+		expect(output).toContain("a=1");
+	});
 });
 
 // #8842: Windows PowerShell 5.1 turned redirected native stderr into a failed command although the native

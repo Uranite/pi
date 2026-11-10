@@ -4,7 +4,8 @@
 
 ### Breaking Changes
 
-- On Windows, the `powershell` tool is now enabled by default alongside `bash`, and PowerShell is presented as the primary shell in the system prompt. Sessions that set `defaultTools` are unaffected; to run without PowerShell, set `"defaultTools": ["read", "bash", "edit", "write"]` ([#7547](https://github.com/earendil-works/pi/issues/7547))
+- On Windows, the `powershell` tool is now enabled by default alongside `bash`, and PowerShell is presented as the primary shell in the system prompt. `defaultTools` lists of plain names are unaffected; lists of only `+name`/`-name` entries now apply to the Windows default set, which includes `powershell`. To run without PowerShell, set `"defaultTools": ["read", "bash", "edit", "write"]` ([#7547](https://github.com/earendil-works/pi/issues/7547))
+- `getPowerShellConfig()` returns stdin-transport args: `args` now carries the `-Command` bootstrap and the script must be written to the child's stdin. Code that appended the command to `args` needs to send it over stdin instead ([#7547](https://github.com/earendil-works/pi/issues/7547))
 
 ### Added
 
@@ -12,7 +13,7 @@
 
 ### Fixed
 
-- The `powershell` tool now sends commands over stdin instead of the Windows command line, so scripts longer than 32,767 characters run instead of failing with `ENAMETOOLONG`. It also sets `$OutputEncoding` to UTF-8 so Windows PowerShell 5.1 does not garble non-ASCII text piped to native programs ([#7547](https://github.com/earendil-works/pi/issues/7547))
+- The `powershell` tool now sends commands over stdin instead of the Windows command line, so scripts longer than 32,767 characters run instead of failing with `ENAMETOOLONG`. It also sets `$OutputEncoding` to BOM-less UTF-8 so Windows PowerShell 5.1 does not garble non-ASCII text piped to native programs, and native programs do not receive a UTF-8 BOM ([#7547](https://github.com/earendil-works/pi/issues/7547))
 
 ## [1.5.1] - 2026-11-09
 

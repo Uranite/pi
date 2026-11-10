@@ -138,7 +138,17 @@ export function getShellConfig(customShellPath?: string): ShellConfig {
 	return { shell: "sh", args: ["-c"] };
 }
 
-export const POWERSHELL_ARGS = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"] as const;
+/**
+ * Arguments before the bootstrap command. The script itself is not an argument: it arrives on
+ * stdin, so `-Command` only carries {@link POWERSHELL_STDIN_COMMAND}.
+ */
+export const POWERSHELL_BOOTSTRAP_ARGS = [
+	"-NoProfile",
+	"-NonInteractive",
+	"-ExecutionPolicy",
+	"Bypass",
+	"-Command",
+] as const;
 
 /**
  * Fixed command that reads the script from stdin. A Windows command line is capped at 32,767
@@ -175,7 +185,7 @@ export function getPowerShellConfig(): ShellConfig {
 		throw new Error("No PowerShell executable found. Install PowerShell or add powershell.exe/pwsh.exe to PATH.");
 	}
 
-	return { shell, args: [...POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND], commandTransport: "stdin" };
+	return { shell, args: [...POWERSHELL_BOOTSTRAP_ARGS, POWERSHELL_STDIN_COMMAND], commandTransport: "stdin" };
 }
 
 export function getShellEnv(): NodeJS.ProcessEnv {

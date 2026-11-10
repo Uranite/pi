@@ -634,6 +634,14 @@ describe("SettingsManager", () => {
 		});
 	});
 
+	describe("getDefaultToolNames", () => {
+		it("adds powershell to the Windows default set only", () => {
+			expect(getDefaultToolNames("win32")).toEqual(["read", "bash", "powershell", "edit", "write"]);
+			expect(getDefaultToolNames("linux")).toEqual(["read", "bash", "edit", "write"]);
+			expect(getDefaultToolNames("darwin")).toEqual(["read", "bash", "edit", "write"]);
+		});
+	});
+
 	describe("defaultTools", () => {
 		it("loads global defaults and lets project settings replace them", () => {
 			writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultTools: ["read", "bash"] }));

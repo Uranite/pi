@@ -1,9 +1,9 @@
 import type * as ChildProcess from "node:child_process";
 import type * as Fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPowerShellConfig, POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND } from "../src/utils/shell.ts";
+import { getPowerShellConfig, POWERSHELL_BOOTSTRAP_ARGS, POWERSHELL_STDIN_COMMAND } from "../src/utils/shell.ts";
 
-const expectedPowerShellArgs = [...POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND];
+const expectedPowerShellArgs = [...POWERSHELL_BOOTSTRAP_ARGS, POWERSHELL_STDIN_COMMAND];
 
 const { accessSyncMock, spawnSyncMock } = vi.hoisted(() => ({
 	accessSyncMock: vi.fn(),
