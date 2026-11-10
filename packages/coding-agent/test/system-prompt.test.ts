@@ -110,6 +110,35 @@ describe("buildSystemPrompt", () => {
 			expect(prompt).toContain(expected);
 		});
 
+		test.each([
+			[["bash"], "Git Bash/MSYS"],
+			[["powershell"], "native Windows paths"],
+			[["bash", "powershell"], "Prefer the powershell tool"],
+		] as const)("describes the Windows shell for %j", (selectedTools, expected) => {
+			const prompt = buildSystemPrompt({
+				platform: "win32",
+				selectedTools: [...selectedTools],
+				contextFiles: [],
+				skills: [],
+				cwd: "C:/work",
+			});
+
+			expect(prompt).toContain(expected);
+		});
+
+		test("omits Windows shell guidance on other platforms", () => {
+			const prompt = buildSystemPrompt({
+				platform: "linux",
+				selectedTools: ["bash", "powershell"],
+				contextFiles: [],
+				skills: [],
+				cwd: "/work",
+			});
+
+			expect(prompt).not.toContain("Git Bash/MSYS");
+			expect(prompt).not.toContain("native Windows paths");
+		});
+
 		test("instructs models to resolve pi docs and examples under absolute base paths", () => {
 			const prompt = buildSystemPrompt({
 				contextFiles: [],

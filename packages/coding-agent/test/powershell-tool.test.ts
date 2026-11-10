@@ -3,7 +3,7 @@ import { win32 } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createLocalPowerShellOperations, createPowerShellTool } from "../src/core/tools/powershell.ts";
 import type * as Shell from "../src/utils/shell.ts";
-import { getPowerShellConfig, POWERSHELL_ARGS } from "../src/utils/shell.ts";
+import { getPowerShellConfig, POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND } from "../src/utils/shell.ts";
 
 const { shellOverride } = vi.hoisted(() => ({ shellOverride: { path: undefined as string | undefined } }));
 
@@ -13,7 +13,11 @@ vi.mock("../src/utils/shell.ts", async (importOriginal) => {
 		...actual,
 		getPowerShellConfig: () =>
 			shellOverride.path
-				? { shell: shellOverride.path, args: [...actual.POWERSHELL_ARGS] }
+				? {
+						shell: shellOverride.path,
+						args: [...actual.POWERSHELL_ARGS, actual.POWERSHELL_STDIN_COMMAND],
+						commandTransport: "stdin" as const,
+					}
 				: actual.getPowerShellConfig(),
 	};
 });
@@ -47,7 +51,11 @@ describe("powershell tool", () => {
 
 	it.skipIf(process.platform !== "win32")("executes PowerShell commands with UTF-8 output", async () => {
 		const config = getPowerShellConfig();
-		expect(config.args).toEqual(POWERSHELL_ARGS);
+		expect(config).toEqual({
+			shell: config.shell,
+			args: [...POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND],
+			commandTransport: "stdin",
+		});
 
 		const tool = createPowerShellTool(process.cwd());
 		const result = await tool.execute("powershell-test", {
@@ -58,6 +66,40 @@ describe("powershell tool", () => {
 		expect(output).toContain("héllo €");
 		expect(output).toContain("Bypass");
 	});
+
+	// #7547: a Windows command line is capped at 32,767 characters, so the script must not be an argument.
+	for (const fileName of ["powershell.exe", "pwsh.exe"] as const) {
+		const shellPath = findPowerShell(fileName);
+		it.skipIf(!shellPath)(
+			`runs scripts longer than the Windows command line with ${fileName}`,
+			async () => {
+				const script = [
+					`$ascii = '${"a".repeat(40000)}'`,
+					"Write-Output $ascii.Length",
+					`$unicode = '${"€".repeat(14000)}'`,
+					"Write-Output $unicode.Length",
+					"Write-Output (Get-Location).Path",
+					"Write-Output 'done'",
+				].join("\n");
+				expect(script.length).toBeGreaterThan(32_767);
+
+				shellOverride.path = shellPath;
+				let output = "";
+				const { exitCode } = await createLocalPowerShellOperations().exec(script, process.cwd(), {
+					onData: (data) => {
+						output += data.toString();
+					},
+				});
+
+				expect(exitCode).toBe(0);
+				expect(output).toContain("40000");
+				expect(output).toContain("14000");
+				expect(output.toLowerCase()).toContain(process.cwd().toLowerCase());
+				expect(output).toContain("done");
+			},
+			120_000,
+		);
+	}
 });
 
 // #8842: Windows PowerShell 5.1 turned redirected native stderr into a failed command although the native

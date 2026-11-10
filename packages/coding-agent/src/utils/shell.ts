@@ -140,6 +140,16 @@ export function getShellConfig(customShellPath?: string): ShellConfig {
 
 export const POWERSHELL_ARGS = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"] as const;
 
+/**
+ * Fixed command that reads the script from stdin. A Windows command line is capped at 32,767
+ * characters, so passing the script after `-Command` fails for long scripts; the script itself
+ * arrives through the stdin transport instead (#7547). `Invoke-Expression` keeps the script in
+ * the bootstrap scope: unlike a script block created with `[scriptblock]::Create`, it can autoload
+ * modules on Windows PowerShell 5.1.
+ */
+export const POWERSHELL_STDIN_COMMAND =
+	"try { [Console]::InputEncoding=[System.Text.Encoding]::UTF8 } catch {}\nInvoke-Expression ([Console]::In.ReadToEnd())";
+
 /** Resolve PowerShell on Windows, preferring PowerShell 7 when available. */
 export function getPowerShellConfig(): ShellConfig {
 	if (process.platform !== "win32") {
@@ -165,7 +175,7 @@ export function getPowerShellConfig(): ShellConfig {
 		throw new Error("No PowerShell executable found. Install PowerShell or add powershell.exe/pwsh.exe to PATH.");
 	}
 
-	return { shell, args: [...POWERSHELL_ARGS] };
+	return { shell, args: [...POWERSHELL_ARGS, POWERSHELL_STDIN_COMMAND], commandTransport: "stdin" };
 }
 
 export function getShellEnv(): NodeJS.ProcessEnv {

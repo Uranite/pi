@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- On Windows, the system prompt now describes the shell environment: the `bash` tool runs Git Bash/MSYS (POSIX paths in commands, native Windows paths for file tools, `cygpath -w` to convert), and the `powershell` tool is presented as the shell for Windows-native commands and paths ([#7547](https://github.com/earendil-works/pi/issues/7547))
+
+### Fixed
+
+- The `powershell` tool now sends commands over stdin instead of the Windows command line, so scripts longer than 32,767 characters run instead of failing with `ENAMETOOLONG`. It also sets `$OutputEncoding` to UTF-8 so Windows PowerShell 5.1 does not garble non-ASCII text piped to native programs ([#7547](https://github.com/earendil-works/pi/issues/7547))
+
 ## [1.5.1] - 2026-11-09
 
 ### New Features

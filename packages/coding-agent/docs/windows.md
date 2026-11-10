@@ -35,6 +35,8 @@ If Pi cannot find Bash, it reports the locations it checked. Install Git for Win
 
 The optional `powershell` tool runs commands through `pwsh.exe` when available, then falls back to Windows PowerShell. It starts PowerShell with `-NoProfile -NonInteractive -ExecutionPolicy Bypass`. Administrator-enforced execution policies can still take precedence.
 
+Commands are written to PowerShell's stdin rather than its command line, so long scripts are not limited by the 32,767-character Windows command-line cap. Output is decoded as UTF-8, and Windows PowerShell 5.1 also gets `$OutputEncoding` set to UTF-8 so non-ASCII text piped to native programs is not garbled.
+
 PowerShell discovery checks these locations in order:
 
 1. `pwsh.exe` on `PATH`

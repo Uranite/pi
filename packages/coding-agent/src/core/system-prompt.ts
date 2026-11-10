@@ -28,6 +28,8 @@ export interface BuildSystemPromptOptions {
 	appendSystemPrompt?: string;
 	/** Additional XML-wrapped prompt sections keyed by tag name. */
 	sections?: Record<string, string>;
+	/** Platform the tools run on, for shell guidance. Default: the current platform. */
+	platform?: NodeJS.Platform;
 	/** Working directory. */
 	cwd: string;
 	/** Pre-loaded context files. */
@@ -44,6 +46,7 @@ export type NormalizedBuildSystemPromptOptions = BuildSystemPromptOptions & {
 	promptGuidelines: string[];
 	appendSystemPrompt: string;
 	sections: Record<string, string>;
+	platform: NodeJS.Platform;
 	contextFiles: Array<{ path: string; content: string }>;
 	skills: Skill[];
 };
@@ -70,6 +73,7 @@ export function normalizeBuildSystemPromptOptions(input: BuildSystemPromptOption
 		promptGuidelines: [...(input.promptGuidelines ?? [])],
 		appendSystemPrompt: input.appendSystemPrompt ?? "",
 		sections: { ...(input.sections ?? {}) },
+		platform: input.platform ?? process.platform,
 		cwd: input.cwd,
 		contextFiles: (input.contextFiles ?? []).map((file) => ({ ...file })),
 		skills: (input.skills ?? []).map((skill) => ({ ...skill })),
@@ -89,6 +93,7 @@ function buildRules(
 	selectedTools: string[],
 	toolGuidelines: Record<string, string[]>,
 	promptGuidelines: string[],
+	platform: NodeJS.Platform,
 ): string {
 	const rules: string[] = [];
 	const seen = new Set<string>();
@@ -115,6 +120,23 @@ function buildRules(
 		}
 	}
 
+	// On Windows the tool name does not tell the model which shell or path rules apply: bash is an
+	// MSYS/Cygwin shell while the file tools take native paths, and PowerShell is the native shell.
+	if (platform === "win32") {
+		if (hasBash) {
+			addRule(
+				"The bash tool runs Git Bash/MSYS on Windows: use POSIX paths inside commands, and pass native Windows paths to the file tools (convert with `cygpath -w`)",
+			);
+		}
+		if (hasPowerShell) {
+			addRule(
+				hasBash
+					? "Prefer the powershell tool for Windows-native commands and paths"
+					: "The powershell tool runs PowerShell on Windows: use cmdlets and native Windows paths",
+			);
+		}
+	}
+
 	for (const name of selectedTools) {
 		for (const rule of toolGuidelines[name] ?? []) addRule(rule);
 	}
@@ -136,6 +158,7 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 		promptGuidelines,
 		appendSystemPrompt,
 		sections: customSections,
+		platform,
 		cwd,
 		contextFiles,
 		skills,
@@ -158,7 +181,7 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 		const tools =
 			visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${toolSnippets[name]}`).join("\n") : "(none)";
 		promptSections.tools = `${tools}\n\nAdditional tools may be available.`;
-		promptSections.rules = buildRules(declaredTools, toolGuidelines, promptGuidelines);
+		promptSections.rules = buildRules(declaredTools, toolGuidelines, promptGuidelines, platform);
 		promptSections.docs = `Pi documentation (read only when the user asks about the harness itself, its SDK, extensions, themes, skills, or TUI):
 - Main documentation: ${getReadmePath()}
 - Additional docs: ${getDocsPath()}
