@@ -67,6 +67,73 @@ describe("powershell tool", () => {
 		expect(output).toContain("Bypass");
 	});
 
+	// A successful command must produce visible output: an `exit` in the suffix once ended the
+	// runspace before the console host flushed the formatted pipeline output (#7547 follow-up).
+	for (const fileName of ["powershell.exe", "pwsh.exe"] as const) {
+		const shellPath = findPowerShell(fileName);
+		it.skipIf(!shellPath)(`keeps the output of successful commands visible with ${fileName}`, async () => {
+			shellOverride.path = shellPath;
+			let output = "";
+			const { exitCode } = await createLocalPowerShellOperations().exec(
+				"Get-ChildItem -Path . -Directory | Select-Object Name",
+				process.cwd(),
+				{
+					onData: (data) => {
+						output += data.toString();
+					},
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(output).toContain("Name");
+			expect(output).not.toBe("");
+		});
+	}
+
+	// The failure path keeps its output too: `exit` truncates the same buffered pipeline output.
+	for (const fileName of ["powershell.exe", "pwsh.exe"] as const) {
+		const shellPath = findPowerShell(fileName);
+		it.skipIf(!shellPath)(`keeps the output of failed commands visible with ${fileName}`, async () => {
+			shellOverride.path = shellPath;
+			let output = "";
+			const { exitCode } = await createLocalPowerShellOperations().exec(
+				"Get-ChildItem -Path . -Directory | Select-Object Name; Get-Item C:\\pi-missing-8842",
+				process.cwd(),
+				{
+					onData: (data) => {
+						output += data.toString();
+					},
+				},
+			);
+
+			expect(exitCode).toBe(1);
+			expect(output).toContain("Name");
+		});
+	}
+
+	// `Set-StrictMode` makes reading an unset $LASTEXITCODE an error, so the suffix reads it only
+	// when a native command set it.
+	for (const fileName of ["powershell.exe", "pwsh.exe"] as const) {
+		const shellPath = findPowerShell(fileName);
+		it.skipIf(!shellPath)(`keeps StrictMode output clean with ${fileName}`, async () => {
+			shellOverride.path = shellPath;
+			let output = "";
+			const { exitCode } = await createLocalPowerShellOperations().exec(
+				"Set-StrictMode -Version Latest; Write-Output done",
+				process.cwd(),
+				{
+					onData: (data) => {
+						output += data.toString();
+					},
+				},
+			);
+
+			expect(exitCode).toBe(0);
+			expect(output).toContain("done");
+			expect(output).not.toContain("LASTEXITCODE");
+		});
+	}
+
 	// #7547: a Windows command line is capped at 32,767 characters, so the script must not be an argument.
 	for (const fileName of ["powershell.exe", "pwsh.exe"] as const) {
 		const shellPath = findPowerShell(fileName);
@@ -103,7 +170,9 @@ describe("powershell tool", () => {
 });
 
 // #8842: Windows PowerShell 5.1 turned redirected native stderr into a failed command although the native
-// command exited 0. Both shells must report the exit codes PowerShell 7 reports.
+// command exited 0. Both shells must report the exit codes PowerShell 7 reports. The suffix never
+// calls `exit`, on either path: an `exit` truncates the console host's formatted output before it is
+// written, which emptied every command's visible output.
 describe("powershell exit codes", () => {
 	const stderrExit0 = 'cmd /c "echo progress 1>&2 & exit 0"';
 	const stderrExit7 = 'cmd /c "echo progress 1>&2 & exit 7"';
@@ -124,6 +193,11 @@ describe("powershell exit codes", () => {
 		[`${stderrExit7}; Write-Output done`, 0],
 		["Write-Output done # comment", 0],
 		[`Set-StrictMode -Version Latest; ${stderrExit0} 2>&1`, 0],
+		["Set-StrictMode -Version Latest; Write-Output done", 0],
+		['Set-StrictMode -Version Latest; Write-Error "failed"', 1],
+		["Set-StrictMode -Version Latest; Get-Item C:\\pi-missing-8842", 1],
+		['$ErrorActionPreference = "Stop"; Set-StrictMode -Version Latest; Write-Output done', 0],
+		['$ErrorActionPreference = "Stop"; Set-StrictMode -Version Latest; Write-Error "failed"', 1],
 		["exit 5", 5],
 	];
 	// Unfinished commands are parse errors: nothing runs, not even the first statement.

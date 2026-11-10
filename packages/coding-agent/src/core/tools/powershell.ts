@@ -16,15 +16,19 @@ import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 const UTF8_OUTPUT_PREFIX =
 	"try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[Console]::OutputEncoding } catch {}\n";
 
-// The script arrives on stdin, so the shell cannot derive an exit code from its last statement.
-// Report the `-Command` rule instead: 0 when the last statement succeeded, 1 when it failed.
-// Windows PowerShell 5.1 also turns redirected native stderr into error records and sets $? to false,
-// so `git push 2>&1 | Select-Object -Last 3` exits 1 although git exited 0 (#8842). Exit 0 when the
-// last failure is only such a record and the native command exited 0. The lone `;` keeps an unfinished
-// last statement, such as `Get-ChildItem |`, a parse error instead of continuing into the suffix and
-// running. A command ending in a backtick would continue into the suffix, so it gets no suffix (#8842).
+// The script arrives on stdin, so report the `-Command` exit rule manually: 0 on success, 1 on
+// failure. `exit` ends the runspace before the console host flushes formatted pipeline output, so
+// the suffix reports failure through `$host.SetShouldExit` instead. `$?` is captured first: read
+// later in the chain it observes the suffix's own evaluation, not the command. `$LASTEXITCODE` is
+// read only when it exists, because `Set-StrictMode` turns an unset variable into an error. The
+// native stderr exemption covers records PS 5.1 misreports as failures (#8842). The lone `;` keeps
+// an unfinished last statement a parse error; a trailing backtick continues into the suffix, so
+// such commands get none (#8842).
 const POWERSHELL_EXIT_SUFFIX =
-	'\n;\nif ($?) { exit 0 }\nif (($LASTEXITCODE -eq 0) -and ("$($Error[0].FullyQualifiedErrorId)" -like "NativeCommandError*")) { exit 0 }\nexit 1';
+	"\n;\n$__piOk = $?\n" +
+	"if (-not $__piOk) {\n" +
+	'\tif (-not ((Test-Path variable:LASTEXITCODE) -and ($LASTEXITCODE -eq 0) -and ("$($Error[0].FullyQualifiedErrorId)" -like "NativeCommandError*"))) { $host.SetShouldExit(1) }\n' +
+	"}";
 
 export const powershellToolSystemPromptContribution = {
 	snippet: "Execute PowerShell commands",
